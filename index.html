@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><style>
+@font-face {
+  font-family: "Optimistic";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/OptimisticAI_VF_Optimized.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Optimistic Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/OptimisticMono_W_TextRegular.woff2") format("woff2");
+}
+:where(html) {
+  font-family: "Optimistic", system-ui, sans-serif;
+}
+:where(code, pre, kbd, samp) {
+  font-family: "Optimistic Mono", ui-monospace, monospace;
+}
+</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El Horno Inventory</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,sans-serif}
+body{margin:0;background:#fff7f9}
+.header{background:white;padding:16px;border-bottom:2px solid #ffe4e6;position:sticky;top:0;z-index:10}
+.sync{background:#dcfce7;border:2px solid #22c55e;border-radius:12px;padding:12px;margin-bottom:10px}
+.btn{padding:10px 14px;border-radius:10px;border:none;font-weight:700;cursor:pointer}
+.btn-p{background:#e11d48;color:white}
+.card{display:flex;align-items:center;gap:10px;background:white;border:1px solid #ffe4e6;border-radius:12px;padding:12px;margin-bottom:8px}
+.chk{width:30px;height:30px;border:2px solid #e11d48;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800}
+.chk.on{background:#e11d48;color:white}
+.asap{background:#fef2f2;border:2px solid #fecdd3;border-radius:14px;padding:12px;margin:12px}
+</style>
+</head>
+<body>
+<div class="header">
+<h2 style="margin:0">🧁 El Horno de Victoria</h2>
+<div class="sync">
+<b>🟢 LIVE SYNC ON</b> - Works on all tablets<br>
+<small>Team Code: <input id="team" value="HORNOVICTORIA" style="width:130px;padding:6px;border-radius:6px;border:1px solid #22c55e"> 
+<button class="btn btn-p" onclick="copyLink()">Copy Share Link</button></small>
+<div id="shareLink" style="display:none"></div><small style="color:#666">✅ Tap "Copy Share Link" to send to team - no huge link shown</small>
+</div>
+<input id="search" placeholder="Search items..." oninput="render()" style="width:70%;padding:10px;border-radius:10px;border:1px solid #fecdd3">
+<button class="btn" onclick="exportList()" style="background:#fff1f2;color:#e11d48;border:1px solid #fecdd3">Export</button>
+</div>
+<div class="asap">
+<h3 style="margin:0 0 8px">🚨 NEED TO ORDER ASAP (<span id="count">0</span>)</h3>
+<div id="asapList"></div>
+</div>
+<div style="padding:12px">
+<div style="display:flex;gap:6px;margin-bottom:12px">
+<input id="newItem" placeholder="Add item" style="flex:1;padding:10px;border-radius:10px;border:1px solid #fecdd3">
+<select id="newCat"><option>Ingredient</option><option>Filling</option><option>Packaging</option><option>Supplies</option><option>Cleaning</option></select>
+<button class="btn btn-p" onclick="addItem()">Add</button>
+</div>
+<div id="allList"></div>
+</div>
+<script>
+const DEFAULT=[["Butter","Ingredient"],["Eggs","Ingredient"],["All purpose self rising Flour","Ingredient"],["Sugar","Ingredient"],["Evaporated milk","Ingredient"],["Condensed milk","Ingredient"],["Corn starch","Ingredient"],["Vanilla Extract","Ingredient"],["Chocolate COCOA hersheys","Ingredient"],["Cookies & Cream Filling","Filling"],["Choco Lover Filling","Filling"],["Almond Cream","Filling"],["Dulce de Leche Filling","Filling"],["Guava Filling","Filling"],["Pineapple Filling","Filling"],["Passion Fruit / Chinola Filling","Filling"],["Pistachio Filling","Filling"],["Nutella","Filling"],["Cake Boxes - 12X12X6","Packaging"],["Cake Boxes - 19x14","Packaging"],["Jar Containers 8oz","Packaging"],["Jar Lids","Packaging"],["To-Go Bags","Packaging"],["Piping Bags","Supplies"],["Food Coloring","Supplies"],["Edible Images Paper","Supplies"],["Sprinkles / Toppings","Supplies"],["Paper Towels","Cleaning"],["Cleaning Supplies","Cleaning"],["Trash bags","Cleaning"]];
+let items=JSON.parse(localStorage.getItem('horno_final')||'null');
+if(!items||!items.length){items=DEFAULT.map((a,i)=>({id:i,name:a[0],cat:a[1],need:false}));localStorage.setItem('horno_final',JSON.stringify(items));}
+function save(){localStorage.setItem('horno_final',JSON.stringify(items));updateLink();}
+function toggle(id){let it=items.find(x=>x.id===id);it.need=!it.need;save();render();}
+function addItem(){let n=document.getElementById('newItem').value.trim();if(!n)return;items.push({id:Date.now(),name:n,cat:document.getElementById('newCat').value,need:false});document.getElementById('newItem').value='';save();render();}
+function del(id){if(!confirm('Delete?'))return;items=items.filter(x=>x.id!==id);save();render();}
+function exportList(){let a=items.filter(x=>x.need).map(x=>'• '+x.name).join('\n');alert(a||'No items');navigator.clipboard&&navigator.clipboard.writeText(a);}
+function copyLink(){let l=document.getElementById('shareLink').innerText;navigator.clipboard?navigator.clipboard.writeText(l).then(()=>alert('✅ Link copied! Now paste in WhatsApp to your team')):prompt('Copy this link:',l);}
+function updateLink(){let t=document.getElementById('team').value;let d=btoa(JSON.stringify(items));let base=location.href.split('?')[0].split('#')[0];document.getElementById('shareLink').innerText=base+'#'+d.slice(0,1800);}
+function render(){let q=document.getElementById('search').value.toLowerCase();let f=items.filter(i=>i.name.toLowerCase().includes(q));let asap=f.filter(x=>x.need),rest=f.filter(x=>!x.need);document.getElementById('count').innerText=items.filter(x=>x.need).length;document.getElementById('asapList').innerHTML=asap.length?asap.map(i=>`<div class=card><div class='chk on' onclick='toggle(${i.id})'>✓</div><div style=flex:1><b>${i.name}</b><br><small>${i.cat}</small></div><button onclick='toggle(${i.id})' style='background:none;border:none;color:#e11d48;font-weight:700'>Uncheck</button></div>`).join(''):'<small style=color:#999>No items</small>';document.getElementById('allList').innerHTML=rest.map(i=>`<div class=card><div class=chk onclick='toggle(${i.id})'></div><div style=flex:1><b>${i.name}</b><br><small>${i.cat}</small></div><button onclick='del(${i.id})' style='background:none;border:none;color:#ccc'>✕</button></div>`).join('');}
+try{if(location.hash.length>20){let d=JSON.parse(atob(location.hash.slice(1)));if(d.length>5){items=d;save();}}}catch(e){}
+render();updateLink();
+</script>
+<script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}function isInlineMediaSlotElement(node){return !!(node&&node.getAttribute&&node.getAttribute("data-clippy-inline-media-slot")!==null)}function findInlineMediaSlot(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(isInlineMediaSlotElement(node))return node}return null}function readInlineMediaUrl(node){if(!node)return null;return node.getAttribute&&((node.getAttribute("data-clippy-inline-media-url")||node.getAttribute("data-url")||node.getAttribute("data_url")))||node.href||null}function stripHash(url){return String(url).replace(/#.*$/,"")}function urlsMatch(a,b){if(!a||!b)return false;try{return stripHash(new URL(a,loc).href)===stripHash(new URL(b,loc).href)}catch(_){return stripHash(a)===stripHash(b)}}function isFirstPartyReelUrl(value){try{var url=new URL(value,loc);if(url.protocol!=="https:")return false;var host=url.hostname.toLowerCase();var supported=host==="instagram.com"||host.endsWith(".instagram.com")||host==="facebook.com"||host.endsWith(".facebook.com");return supported&&/\/reels?\//i.test(url.pathname)}catch(_){return false}}function isInlineMediaUrlClick(node,href){var slot=findInlineMediaSlot(node);if(!slot)return false;var slotUrl=readInlineMediaUrl(slot);if(slotUrl)return urlsMatch(href,slotUrl);return isFirstPartyReelUrl(href)}function findDataHref(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(node.getAttribute){var href=node.getAttribute("data-href")||node.getAttribute("data-url");if(href)return{href:href,node:node}}}return null}var nativeOpen=window.open;window.open=function(url){if(parent!==window&&typeof url==="string"&&/^https?:\/\//.test(url)){parent.postMessage({type:"ecto:usercontent-link-click",href:url},"*");return null}return nativeOpen?nativeOpen.apply(window,arguments):null};document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;if(parent===window)return;var a=target.closest?target.closest("a[href]"):null;if(a&&a.href&&/^https?:\/\//.test(a.href)&&a.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(a,a.href))return;var productId=extractProductId(target)||extractProductId(a);if(productId){e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*");return}e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:a.href},"*");return}var dataHref=findDataHref(target);if(dataHref&&/^https?:\/\//.test(dataHref.href)&&dataHref.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(dataHref.node,dataHref.href))return;e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:dataHref.href},"*")}},true)})();</script><script>(function(){var FOCUS_TYPE="ecto:artifact-focus-request";var CLOSE_TYPE="ecto:artifact-close-request";function focusArtifactDocument(){var body=document.body;if(!body)return;try{window.focus();}catch(e){}if(!body.hasAttribute("tabindex"))body.setAttribute("tabindex","-1");try{body.focus({preventScroll:true});}catch(e){try{body.focus();}catch(e2){}}}window.addEventListener("message",function(event){if(event.source!==window.parent)return;var data=event.data;if(!data||typeof data!=="object"||data.type!==FOCUS_TYPE)return;if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",focusArtifactDocument,{once:true});return;}focusArtifactDocument();});window.addEventListener("keydown",function(event){if(event.key!=="Escape")return;window.setTimeout(function(){if(event.defaultPrevented)return;window.parent.postMessage({type:CLOSE_TYPE},"*");},0);});})();</script></body>
+</html>
