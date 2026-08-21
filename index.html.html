@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El Horno de Victoria</title>
+<style>*{box-sizing:border-box;font-family:system-ui,sans-serif}body{margin:0;background:#fff7f9;color:#1a1a1a}.header{background:white;padding:14px;border-bottom:2px solid #ffe4e6;position:sticky;top:0;z-index:20}.live{display:flex;justify-content:space-between;align-items:center}.dot{width:12px;height:12px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px #dcfce7;animation:pulse 2s infinite}.btn{padding:10px 14px;border-radius:10px;border:none;font-weight:700;cursor:pointer}.btn-p{background:#e11d48;color:white}.card{display:flex;align-items:center;gap:10px;background:white;border:1px solid #ffe4e6;border-radius:14px;padding:12px;margin-bottom:8px}.chk{width:32px;height:32px;border:2px solid #e11d48;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800;flex-shrink:0;font-size:18px}.chk.on{background:#e11d48;color:white}.asap{background:#fef2f2;border:2px solid #fecdd3;border-radius:16px;padding:14px;margin:12px}.pill{font-size:10px;padding:3px 8px;border-radius:999px;background:#fff1f2;color:#e11d48;font-weight:700;text-transform:uppercase;display:inline-block;margin-top:4px}.cat-btn{padding:8px 14px;border-radius:999px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;border:1px solid #fecdd3;background:white;color:#e11d48}.cat-btn.active{background:#e11d48;color:white;border:2px solid #e11d48}input,select{padding:11px;border-radius:10px;border:1px solid #fecdd3;font-size:14px}.filter-box{background:white;border:1px solid #ffe4e6;border-radius:14px;padding:12px;margin-top:12px}</style></head>
+<body><div class="header"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0;font-size:20px">🧁 El Horno de Victoria</h2><div class="live"><b>● LIVE</b><div class="dot"></div></div></div><div class="filter-box"><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:140px"><input id="search" placeholder="Search..." oninput="render()" style="width:100%"></div><div style="flex:1;min-width:140px"><select id="categoryFilter" onchange="filter=this.value;render()" style="width:100%;font-weight:700"><option value="All">All</option><option value="Ingredient">Ingredient</option><option value="Filling">Filling</option><option value="Packaging">Packaging</option><option value="Supplies">Supplies</option><option value="Cleaning">Cleaning</option></select></div></div><div id="filters" style="display:flex;gap:6px;overflow-x:auto;margin-top:10px"></div></div></div>
+<div class="asap"><h3 style="margin:0 0 10px;font-size:15px">NEED TO ORDER (<span id="asapCount">0</span>)</h3><div id="asapList"></div></div>
+<div style="padding:12px"><div style="background:white;border:2px solid #ffe4e6;border-radius:14px;padding:14px;margin-bottom:14px"><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="newItem" placeholder="Add item" style="flex:2;min-width:120px"><select id="newCat" style="flex:1"><option>Ingredient</option><option>Filling</option><option>Packaging</option><option>Supplies</option><option>Cleaning</option></select><button class="btn btn-p" onclick="addItem()">Add</button></div></div><div id="allList"></div></div>
+<script>
+// FIXED - NO DUPLICATION VERSION
+// Your Sheet: 1lI9G3ICbm3br6tlM-dCbrmfAO4WJxBnTVUOwOlBfEpQ
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxaJW05jRpCAY7UKGW1DePrDZsabGXdc1poSatwrgQ-mOQlg8nCLRcDJY0uci3b3HVhEg/exec";
+const DEFAULT=[["Butter","Ingredient"],["Eggs","Ingredient"],["All purpose self rising Flour","Ingredient"],["Sugar","Ingredient"],["Evaporated milk","Ingredient"],["Condensed milk","Ingredient"],["Corn starch","Ingredient"],["Vanilla Extract","Ingredient"],["Chocolate COCOA hersheys","Ingredient"],["Cookies & Cream Filling","Filling"],["Choco Lover Filling","Filling"],["Almond Cream","Filling"],["Dulce de Leche Filling","Filling"],["Guava Filling","Filling"],["Pineapple Filling","Filling"],["Passion Fruit / Chinola Filling","Filling"],["Pistachio Filling","Filling"],["Nutella","Filling"],["Cake Boxes - 12X12X6","Packaging"],["Cake Boxes - 19x14","Packaging"],["Jar Containers 8oz","Packaging"],["Jar Lids","Packaging"],["To-Go Bags","Packaging"],["Piping Bags","Supplies"],["Food Coloring","Supplies"],["Edible Images Paper","Supplies"],["Sprinkles / Toppings","Supplies"],["Paper Towels","Cleaning"],["Cleaning Supplies","Cleaning"],["Trash bags","Cleaning"]];
+
+function dedupe(arr){
+  const seen=new Map();
+  arr.forEach(it=>{
+    if(!it || !it.name) return;
+    const key=it.name.toLowerCase().trim();
+    if(!seen.has(key)) seen.set(key,it);
+    else {
+      // Keep the one with need=true if exists, otherwise last
+      const existing=seen.get(key);
+      if(it.need && !existing.need) seen.set(key,it);
+    }
+  });
+  return Array.from(seen.values());
+}
+
+let items=[];let filter='All';let isSaving=false;let lastSave=0;
+
+function initDefault(){items=DEFAULT.map((a,i)=>({id:i+1,name:a[0],cat:a[1],need:false}));}
+
+function saveLocal(){
+  items=dedupe(items);
+  localStorage.setItem('horno_fixed',JSON.stringify(items));
+}
+
+async function saveCloud(){
+  if(isSaving || Date.now()-lastSave<800) return; // Prevent double save
+  isSaving=true; lastSave=Date.now();
+  items=dedupe(items);
+  saveLocal();
+  render(); // Immediate UI update
+  try{
+    await fetch(WEB_APP_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'save',items})});
+  }catch(e){}
+  setTimeout(()=>{isSaving=false;},1200);
+}
+
+async function loadCloud(){
+  if(isSaving) return;
+  try{
+    let res=await fetch(WEB_APP_URL+"?action=load&t="+Date.now(),{cache:'no-store'});
+    if(res.ok){
+      let data=await res.json();
+      if(data.items && data.items.length>0 && data.items.length<=50){
+        let cloud=dedupe(data.items);
+        if(JSON.stringify(cloud)!==JSON.stringify(items)){
+          items=cloud;
+          saveLocal();
+          render();
+        }
+      }
+    }
+  }catch(e){}
+}
+
+function toggle(id){
+  // Find by id and prevent duplicate toggle
+  if(isSaving) return;
+  let it=items.find(x=>x.id===id);
+  if(!it) return;
+  it.need=!it.need;
+  saveCloud();
+}
+
+function addItem(){
+  let n=document.getElementById('newItem').value.trim();
+  let c=document.getElementById('newCat').value;
+  if(!n) return;
+  if(items.some(x=>x.name.toLowerCase()===n.toLowerCase())){
+    alert('Already exists: '+n);
+    return;
+  }
+  items.push({id:Date.now(),name:n,cat:c,need:false});
+  document.getElementById('newItem').value='';
+  saveCloud();
+}
+
+function delItem(id){
+  if(!confirm('Delete?')) return;
+  items=items.filter(x=>x.id!==id);
+  saveCloud();
+}
+
+function render(){
+  items=dedupe(items);
+  let q=document.getElementById('search').value.toLowerCase();
+  document.getElementById('categoryFilter').value=filter;
+  let cats=['All','Ingredient','Filling','Packaging','Supplies','Cleaning'];
+  document.getElementById('filters').innerHTML=cats.map(c=>{
+    let cnt=c==='All'?items.length:items.filter(x=>x.cat===c).length;
+    return `<button class="cat-btn ${filter===c?'active':''}" onclick="filter='${c}';render()">${c} (${cnt})</button>`;
+  }).join('');
+  let f=items.filter(it=>it.name.toLowerCase().includes(q)&&(filter==='All'||it.cat===filter));
+  let asap=f.filter(x=>x.need);
+  let rest=f.filter(x=>!x.need);
+  document.getElementById('asapCount').innerText=items.filter(x=>x.need).length;
+  document.getElementById('asapList').innerHTML=asap.length?asap.map(it=>`<div class="card" style="border-color:#fca5a5;background:#fff5f5"><div class="chk on" onclick="toggle(${it.id})">✓</div><div style="flex:1"><b>${it.name}</b><br><span class="pill">${it.cat}</span></div><button onclick="toggle(${it.id})" style="background:none;border:none;color:#e11d48;font-weight:700;font-size:12px">Uncheck</button></div>`).join(''):'<div style="color:#999;font-size:12px;padding:8px">No items</div>';
+  document.getElementById('allList').innerHTML=rest.length?rest.map(it=>`<div class="card"><div class="chk" onclick="toggle(${it.id})"></div><div style="flex:1"><b>${it.name}</b><br><span class="pill">${it.cat}</span></div><button onclick="delItem(${it.id})" style="background:none;border:none;color:#ccc;font-size:18px">✕</button></div>`).join(''):'<div style="text-align:center;color:#999;padding:20px">No items</div>';
+}
+
+// Load - dedupe immediately to fix existing duplicates
+let local=localStorage.getItem('horno_fixed') || localStorage.getItem('horno_sheet_final') || localStorage.getItem('horno_final') || localStorage.getItem('horno_final_clean');
+if(local){
+  try{ items=dedupe(JSON.parse(local)); }catch{ initDefault(); }
+} else { initDefault(); }
+items=dedupe(items);
+render();
+loadCloud();
+setInterval(loadCloud,15000);
+</script><style>@keyframes pulse{0%{opacity:1}50%{opacity:0.6}100%{opacity:1}}</style></body></html>
